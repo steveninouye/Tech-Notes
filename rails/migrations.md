@@ -233,3 +233,133 @@ On that note, **foreign keys** are pretty much always a good choice for
 indexing because they're frequently used in both `WHERE` clauses and in
 `JOIN` conditions, both of which can be incredibly taxing when not
 indexed.
+
+---------
+
+# Associations III: `has_one` and HABTM
+
+### The `has_one` Association
+
+`has_one` is a `has_many` association where at most one associated
+record will exist. As a convenience, instead of returning an empty or
+one-element array, `has_one` will return the associated object (or
+`nil`, if the associated object doesn't exist).
+
+`has_one` is not very common, because it implies that there is a
+one-to-one association between two records in the database. In that
+case, it would be more typical for those two tables to be merged.
+
+One exception is if one of the tables contains a lot of "wide" columns
+that contain a lot of data and is not likely to be used often. In that
+case, you may wish to extract some of the "wide" columns into a table
+that is related 1 to 1.
+
+### The `has_one :through` Association
+
+This acts the same as `has_many :through`, but tells ActiveRecord that
+only one record will be returned, so don't put it in an array. This is
+exactly analogous to what you saw with traditional `has_one` vs
+`has_many`. Because it wouldn't make sense to use a `has_one :through`
+which traverses a `has_many` association, `has_one :through` is
+used to link up `belongs_to` and `has_one` associations only.
+
+### The `has_and_belongs_to_many` (HABTM) Association
+
+ActiveRecord has a way of defining a many-to-many association without
+requiring a model for the intervening join table. This is the
+`has_and_belongs_to_many` association. It is a shortcut to writing
+`has_many :through` associations. All it does is save you a little
+more boilerplate.
+
+I (and many others) don't advise this approach, since join tables
+often contain useful information. For instance, an `appointments`
+table could have the start and end time of the appointment. In that
+case, you'll want an `Appointment` model class anyway.
+
+For this reason, I won't further describe HABTM; you can look it up if/when you encounter it.
+
+---------
+
+# Unconventional Associations
+
+## Reflexive Associations
+
+We've learned about the `class_name`/`foreign_key`/`primary_key`
+options for `belongs_to` and `has_many`. We know that Rails can often
+infer these. Let's see an example where it cannot:
+
+```ruby
+class Employee < ApplicationRecord
+  has_many :subordinates,
+    class_name: 'Employee',
+    foreign_key: :manager_id,
+    primary_key: :id
+
+  belongs_to :manager,
+    class_name: 'Employee',
+    foreign_key: :manager_id,
+    primary_key: :id
+end
+```
+
+I call this a *reflexive association*, because the association refers
+back to the same table. Here, there is a `employees.manager_id` column
+that refers to `employees.id` column.
+
+We have to use the non-standard association names
+`subordinates`/`manager` because `employees`/`employee` would be
+extremely confusing to understand. Also, Rails itself will probably
+get confused if you have two associations on the same class that
+differ only in pluralization.
+
+Note that I also departed from the conventional `employee_id` column
+name. `manager_id` better explains the nature of this key.
+
+## Two associations to the same class
+
+Let's look at another example:
+
+```ruby
+# emails: id|from_email_address|to_email_address|text
+#  users: id|email_address
+
+class User < ApplicationRecord
+  has_many(
+    :sent_emails,
+    class_name: 'Email',
+    foreign_key: :from_email_address,
+    primary_key: :email_address
+  )
+  has_many(
+    :received_emails,
+    class_name: 'Email',
+    foreign_key: :to_email_address,
+    primary_key: :email_address
+  )
+end
+
+class Email < ApplicationRecord
+  belongs_to(
+    :sender,
+    class_name: 'User',
+    foreign_key: :from_email_address,
+    primary_key: :email_address
+  )
+  belongs_to(
+    :recipient,
+    class_name: 'User',
+    foreign_key: :to_email_address,
+    primary_key: :email_address
+  )
+end
+```
+
+Here the `Email` and `User` objects are associated in two ways: sender
+and recipient. Additionally, the `Email` record doesn't reference
+`User`'s `id` field directly; instead, it refers to an
+`email_address`. For that reason, we need to specify the `primary_key`
+option; this is otherwise by default simply `id`.
+
+Through these two examples, we've seen that we can go beyond the
+conventional `ActiveRecord` guesses in cases where our associations are
+a little special.
