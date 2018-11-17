@@ -137,18 +137,23 @@ Be mindful though.  The way the tests set the current user is though this method
 This is the way I do it:
 ```ruby
 class ApplicationController
+
   def current_user
-    @current_user = User.find_by(id: session[:session_token]) if session[:session_token]
+    User.find_by(id: session[:session_token]) if session && session[:session_token]
+  end
+
+  def set_current_user
+    @current_user = current_user
   end
 end
 
 class UsersController < ApplicationController
-  before_action :current_user
+  before_action :set_current_user
 
 end
 
 class SessionsController < ApplicationController
-  before_action :current_user
+  before_action :set_current_user
 
 end
 ```
