@@ -112,19 +112,23 @@ You already know there are going to be users and forms.  Get really good at buil
 
 As you can see this is a very bare skeleton that I can easily modify with copy and pasting and deleting.  The great thing is I can easily modify this for a button in the case of making a DELETE request.
 
-### Always Initiate Flash
-The worst thing in the world is getting an error that says `Can't find _____ on nil class` (something along those lines).  Many times this happens when you forget that you have a element trying to display flash[:errors] (or notices) and flash is not defined).  There is a simple way around this.  Always have it defined!
+### Always Initiate a Single Instance
+The worst thing in the world is getting an error that says `Can't find _____ on nil class` (something along those lines).  Many times this happens when you forget that you have a element trying to display flash[:errors] (or notices) and flash is not defined).  It also occurs when you your page is looking for an instance variable and you never initiated on.  Just do it all the time in the `before_action`.  Your methods run after the `before_action` starts and how much easier would it be to know you always have an instance variable to rely on
 
 This is the way I do it:
 ```ruby
 class UsersController < ApplicationController
-  before_action :initiate_flash, only: [:create, :update, :destroy]
+  before_action :initialize_user, :initialize_flash
 
   private
 
-  def initiate_flash
-    flash[:errors] = []
-    flash[:notices] = []
+  def initialize_flash
+    flash[:errors] ||= []
+    flash[:notices] ||= []
+  end
+
+  def initialize_user
+    @user = User.new
   end
 end
 ```
@@ -139,24 +143,74 @@ This is the way I do it:
 class ApplicationController
 
   def current_user
-    User.find_by(id: session[:session_token]) if session && session[:session_token]
-  end
-
-  def set_current_user
-    @current_user = current_user
+    @current_user = User.find_by(id: session[:session_token]) if session && session[:session_token]
   end
 end
 
 class UsersController < ApplicationController
-  before_action :set_current_user
+  before_action :current_user
 
 end
 
 class SessionsController < ApplicationController
-  before_action :set_current_user
+  before_action :current_user
 
 end
 ```
+
+### Screw The Page Design
+We aren't getting graded on our User Interface (U.I.) save the typing, stop putting things into lists and paragraphs, and just render the strings that it wants while giving yourself enough spacing between sections so that if you need to troubleshoot it later down the line you can easily read it.  No Job recruiter is going to read this.  Just get it done!
+
+This is how I literally displayed information for the links page on the practice assessment
+
+```rubyonrails
+<%= @link.user.username %>
+<%= @link.user.username %>
+<%= @link.title %>
+<%= @link.url %>
+
+
+
+<a href="<%= links_url %>">Links</a>
+<a href="<%= edit_link_url(@link) %>">Edit Link</a>
+
+
+
+<h1>Add Comment</h1>
+<form action="<%= link_comments_url(@link) %>" method="post">
+  <input type="hidden" name="authenticity_token" value="<%= form_authenticity_token %>">
+  <input type="hidden" name="link_id" value="<%= @link_id %>">
+  <input type="hidden" name="_method" value="post">
+
+  <label>
+    Comment:
+    <input type="text" name="comment[body]" value="">
+  </label>
+
+  <input type="submit" value="Add Comment">
+</form>
+
+
+
+
+<% @link.comments.each do |comment| %>
+<%= comment.body %>
+<form action="<%= comment_url(comment) %>" method="post">
+  <input type="hidden" name="_method" value="delete">
+  <input type="hidden" name="authenticity_token" value="<%= form_authenticity_token %>">
+  <input type="submit" value="Remove Comment">
+</form>
+
+<% end %>
+```
+
+## Some Other Tips I Heard Are Good
+
+### Use Launchy
+I heard it's good.  I've never used it but some people like to visually see what is going on with their page.  The gem runs like a debugger and opens the page so that the programmer can view what is going on.  IDK, sounds cool???  Byebug has worked well enough for me
+
+### You Don't Need The Authenticity Tokens... Unless...
+You don't need the form authenticity tokens unless you're going to actually open up the page and submit a form.  Again, I don't open the browser so use this as just a tool of knowledge for your back pocket if the time arises.  All I know is that it is a pain to type that one block and I rather save my keystrokes.
 
 ### Disclaimer
 Of course I'm not saying this is the most beautiful style of code but it is fast.  Pick and choose what helps you and if not, throw it away.  Best of luck to everyone!
